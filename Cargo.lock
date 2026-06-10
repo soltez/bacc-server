@@ -80,8 +80,9 @@ dependencies = [
 
 [[package]]
 name = "bacc-rs"
-version = "0.1.1"
-source = "git+https://github.com/soltez/bacc-rs#b023bde3a3200203d0253fd4613a6fb99e3674e2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf4c2ae8f0bb9dd287ec197ef8782f62941bd624d6f2f0a2ba879b585a966c7d"
 dependencies = [
  "arrayvec",
  "kev-rs",
@@ -99,6 +100,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tower-http",
 ]
 
 [[package]]
@@ -755,6 +757,20 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
+]
+
+[[package]]
+name = "tower-http"
+version = "0.6.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cfcf7e2740e6fc6d4d688b4ef00650406bb94adf4731e43c096c3a19fe40840"
+dependencies = [
+ "bitflags",
+ "bytes",
+ "http",
+ "pin-project-lite",
+ "tower-layer",
+ "tower-service",
 ]
 
 [[package]]
