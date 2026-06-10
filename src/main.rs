@@ -9,6 +9,7 @@ use axum::{
 use bacc::{BaccaratRound, BaccaratScoreboard, BaccaratShoe};
 use serde::Serialize;
 use tokio::sync::RwLock;
+use tower_http::cors::CorsLayer;
 
 const NUM_DECKS: usize = 8;
 const PASSES: u8 = 1;
@@ -111,7 +112,8 @@ async fn main() {
         .route("/round/next", post(post_round_next))
         .route("/round", get(get_round))
         .route("/scoreboard", get(get_scoreboard))
-        .with_state(state);
+        .with_state(state)
+        .layer(CorsLayer::permissive());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await
