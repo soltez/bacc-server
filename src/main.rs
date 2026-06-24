@@ -6,26 +6,42 @@ use axum::{
     http::StatusCode,
     routing::{get, post},
 };
-use bacc::{BaccaratRound, BaccaratScoreboard, BaccaratShoe};
+use bacc::BaccShoe;
+use bacc_core::BaccScoreboard;
+use rand::seq::SliceRandom;
 use serde::Serialize;
+use shoe::{Card, DECK, Shoe};
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 
 const NUM_DECKS: usize = 8;
-const PASSES: u8 = 1;
-const PENETRATION: f32 = 0.75;
+const PASSES: u8 = 3;
+const PENETRATION: f32 = 0.965;
+
+fn new_shoe() -> BaccShoe {
+    let mut rng = rand::thread_rng();
+    let mut cards: Vec<Card> = (0..NUM_DECKS).flat_map(|_| DECK).collect();
+    for _ in 0..PASSES {
+        cards.shuffle(&mut rng);
+    }
+    let total = cards.len();
+    let cut_idx = (total as f32 * (1.0 - PENETRATION)) as usize;
+    cards.push(Card::Cut);
+    cards.swap(cut_idx, total);
+    BaccShoe::from(Shoe::from(cards.as_slice()))
+}
 
 struct AppState {
-    shoe: BaccaratShoe,
-    scoreboard: BaccaratScoreboard,
+    shoe: BaccShoe,
+    scoreboard: BaccScoreboard,
     current_round: Option<RoundResponse>,
 }
 
 impl AppState {
     fn new() -> Self {
         Self {
-            shoe: BaccaratShoe::new(NUM_DECKS, PASSES, PENETRATION),
-            scoreboard: BaccaratScoreboard::new(),
+            shoe: new_shoe(),
+            scoreboard: BaccScoreboard::new(),
             current_round: None,
         }
     }
@@ -36,43 +52,27 @@ impl AppState {
         let round = match self.shoe.next() {
             Some(r) => r,
             None => {
-                self.shoe = BaccaratShoe::new(NUM_DECKS, PASSES, PENETRATION);
+                self.shoe = new_shoe();
                 self.scoreboard.clear();
                 self.shoe.next().expect("fresh shoe yielded no round")
             }
         };
         self.scoreboard.update(&round);
-        self.current_round = Some(RoundResponse::from_round(&round));
+        self.current_round = Some(RoundResponse {
+            encoded_hex: round.encode().to_string(),
+        });
         self.current_round.as_ref().unwrap()
     }
 }
 
 #[derive(Serialize, Clone)]
 struct RoundResponse {
-    encoded: u32,
-    is_forced_third: bool,
-    cut_card_index: Option<u8>,
-    player_cards: Vec<u32>,
-    banker_cards: Vec<u32>,
-}
-
-impl RoundResponse {
-    fn from_round(round: &BaccaratRound) -> Self {
-        Self {
-            encoded: round.encode(),
-            is_forced_third: round.is_forced_third(),
-            cut_card_index: round.cut_card_index(),
-            player_cards: round.player_cards().iter().map(|c| *c as u32).collect(),
-            banker_cards: round.banker_cards().iter().map(|c| *c as u32).collect(),
-        }
-    }
+    encoded_hex: String,
 }
 
 #[derive(Serialize)]
 struct ScoreboardResponse {
-    bead_plate: String,
-    big_road: String,
-    derived_roads: [String; 3],
+    encoded_hex: String,
 }
 
 async fn post_round_next(State(state): State<Arc<RwLock<AppState>>>) -> Json<RoundResponse> {
@@ -94,13 +94,8 @@ async fn get_round(
 
 async fn get_scoreboard(State(state): State<Arc<RwLock<AppState>>>) -> Json<ScoreboardResponse> {
     let state = state.read().await;
-    let bead_plate = state.scoreboard.bead_plate().to_str_radix(16);
-    let big_road = state.scoreboard.big_road().to_str_radix(16);
-    let derived_roads = state.scoreboard.derived_roads().map(|r| r.to_str_radix(16));
     Json(ScoreboardResponse {
-        bead_plate,
-        big_road,
-        derived_roads,
+        encoded_hex: state.scoreboard.encode().to_string(),
     })
 }
 
